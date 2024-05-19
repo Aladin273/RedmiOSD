@@ -1,0 +1,21 @@
+{
+    "presets": [
+        {
+            "name": "silence",
+            "args": {
+                "stapm-limit": 15000,
+                "fast-limit": 15000,
+                "slow-limit": 15000
+            }
+        },
+        {
+            "name": "turbo",
+            "args": {
+                "stapm-limit": 54000,
+                "fast-limit": 54000,
+                "slow-limit": 54000
+            }
+        }
+    ],
+    "active": "silence"
+}
