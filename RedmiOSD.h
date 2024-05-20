@@ -50,8 +50,8 @@ private slots:
     void silenceButtonClicked();
     void turboButtonClicked();
 
-    void silenceKeySequenceChanged();
-    void turboKeySequenceChanged();
+    void silenceKeySequenceFinished();
+    void turboKeySequenceFinished();
 
 private:
     void readPresets(const QString& filePath);

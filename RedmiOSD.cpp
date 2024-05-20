@@ -60,8 +60,14 @@ RedmiOSD::RedmiOSD()
     connect(m_silenceButton, &QPushButton::clicked, this, &RedmiOSD::silenceButtonClicked);
     connect(m_turboButton, &QPushButton::clicked, this, &RedmiOSD::turboButtonClicked);
     
-    connect(m_silenceKeySequence, &QKeySequenceEdit::editingFinished, this, &RedmiOSD::silenceKeySequenceChanged);
-    connect(m_turboKeySequence, &QKeySequenceEdit::editingFinished, this, &RedmiOSD::turboKeySequenceChanged);
+    connect(m_silenceKeySequence, &QKeySequenceEdit::keySequenceChanged, [this](const QKeySequence& keySequence) { m_updateTimer.stop(); });
+    connect(m_turboKeySequence, &QKeySequenceEdit::keySequenceChanged, [this](const QKeySequence& keySequence) { m_updateTimer.stop(); });
+
+    connect(m_silenceKeySequence, &QKeySequenceEdit::editingFinished, this, &RedmiOSD::silenceKeySequenceFinished);
+    connect(m_turboKeySequence, &QKeySequenceEdit::editingFinished, this, &RedmiOSD::turboKeySequenceFinished);
+
+    connect(&m_silenceShortcut, &QHotkey::activated, this, &RedmiOSD::silenceButtonClicked);
+    connect(&m_turboShortcut, &QHotkey::activated, this, &RedmiOSD::turboButtonClicked);
     
     connect(&m_updateTimer, &QTimer::timeout, this, &RedmiOSD::updatePresets);
 
@@ -166,22 +172,26 @@ void RedmiOSD::turboButtonClicked()
     applyPreset(m_presets.argsMap["turbo"]);
 }
 
-void RedmiOSD::silenceKeySequenceChanged()
+void RedmiOSD::silenceKeySequenceFinished()
 {
     m_presets.shorcutsMap["silence"] = m_silenceKeySequence->keySequence().toString();
     writePresets(m_filePath);
     
-    createShortcuts();
+    m_silenceShortcut.setShortcut(QKeySequence(m_presets.shorcutsMap["silence"]), true);
     setFocus();
+
+    m_updateTimer.start(m_presets.updateRate);
 }
 
-void RedmiOSD::turboKeySequenceChanged()
+void RedmiOSD::turboKeySequenceFinished()
 {
     m_presets.shorcutsMap["turbo"] = m_turboKeySequence->keySequence().toString();
     writePresets(m_filePath);
 
-    createShortcuts();
+    m_turboShortcut.setShortcut(QKeySequence(m_presets.shorcutsMap["turbo"]), true);
     setFocus();
+
+    m_updateTimer.start(m_presets.updateRate);
 }
 
 void RedmiOSD::readPresets(const QString& filePath)
@@ -412,10 +422,12 @@ void RedmiOSD::createWindow()
     m_silenceKeySequence = new QKeySequenceEdit();
     m_silenceKeySequence->setKeySequence(m_presets.shorcutsMap["silence"]);
     m_silenceKeySequence->setClearButtonEnabled(true);
+    m_silenceKeySequence->setMaximumSequenceLength(1);
 
     m_turboKeySequence = new QKeySequenceEdit();
     m_turboKeySequence->setKeySequence(m_presets.shorcutsMap["turbo"]);
     m_turboKeySequence->setClearButtonEnabled(true);
+    m_turboKeySequence->setMaximumSequenceLength(1);
 
     horizontalLayout1->addWidget(new QLabel("Active Preset :"));
     horizontalLayout1->addWidget(m_activeLabel);
@@ -485,7 +497,4 @@ void RedmiOSD::createShortcuts()
 {
     m_silenceShortcut.setShortcut(QKeySequence(m_presets.shorcutsMap["silence"]), true);
     m_turboShortcut.setShortcut(QKeySequence(m_presets.shorcutsMap["turbo"]), true);
-
-    QObject::connect(&m_silenceShortcut, &QHotkey::activated, this, &RedmiOSD::silenceButtonClicked);
-    QObject::connect(&m_turboShortcut, &QHotkey::activated, this, &RedmiOSD::turboButtonClicked);
 }
