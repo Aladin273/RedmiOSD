@@ -3,21 +3,16 @@
 #include <QSystemTrayIcon>
 #include <QDialog>
 #include <QTimer>
-#include <QKeyEvent>
+#include <QHotkey>
 
 QT_BEGIN_NAMESPACE
-class QAction;
-class QCheckBox;
-class QComboBox;
-class QGroupBox;
 class QLabel;
-class QLineEdit;
-class QMenu;
+class QComboBox;
+class QCheckBox;
 class QPushButton;
-class QSpinBox;
-class QTextEdit;
 class QKeySequenceEdit;
-class QVBoxLayout;
+class QAction;
+class QMenu;
 class QTimer;
 class QProcess;
 QT_END_NAMESPACE
@@ -25,10 +20,10 @@ QT_END_NAMESPACE
 struct Presets
 {
     QMap<QString, QStringList> argsMap;
+    QMap<QString, QString> shorcutsMap;
     QString defaultPreset;
     QString lastPreset;
     bool showTray;
-    QString shortCut;
 };
 
 class RedmiOSD : public QDialog
@@ -43,15 +38,18 @@ protected:
 
 private slots:
     void trayActivated(QSystemTrayIcon::ActivationReason reason);
-
+    
+    void defaultComboBoxChanged(const QString& text);
+    void trayCheckBoxToggled(bool checked);
+    
     void silenceButtonClicked();
     void turboButtonClicked();
-    void defaultComboBoxChanged(const QString& text);
-    void shortcutKeySequenceChanged(const QKeySequence& keySequence);
-    void trayCheckBoxToggled(bool checked);
+
+    void silenceKeySequenceChanged();
+    void turboKeySequenceChanged();
 
 private:
-    Presets readPresets(const QString& filePath);
+    void readPresets(const QString& filePath);
     void writePresets(const QString& filePath);
     
     void applyPreset(const QStringList& args);
@@ -61,15 +59,22 @@ private:
 
     void createWindow();
     void createTray();
+    void createShortcuts();
 
     QSystemTrayIcon* m_trayIcon;
-
+    
     QLabel* m_activeLabel;
+    QComboBox* m_defaultComboBox;
+    QCheckBox* m_trayCheckBox;
+
     QPushButton* m_silenceButton;
     QPushButton* m_turboButton;
-    QComboBox* m_defaultComboBox;
-    QKeySequenceEdit* m_shortcutKeySequence;
-    QCheckBox* m_trayCheckBox;
+    
+    QKeySequenceEdit* m_silenceKeySequence;
+    QKeySequenceEdit* m_turboKeySequence;
+    
+    QHotkey m_silenceShortcut;
+    QHotkey m_turboShortcut;
 
     Presets m_presets;
     QString m_filePath = "Presets.json";
