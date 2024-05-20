@@ -172,7 +172,7 @@ void RedmiOSD::silenceKeySequenceChanged()
     writePresets(m_filePath);
     
     createShortcuts();
-    m_silenceKeySequence->clearFocus();
+    setFocus();
 }
 
 void RedmiOSD::turboKeySequenceChanged()
@@ -181,7 +181,7 @@ void RedmiOSD::turboKeySequenceChanged()
     writePresets(m_filePath);
 
     createShortcuts();
-    m_turboKeySequence->clearFocus();
+    setFocus();
 }
 
 void RedmiOSD::readPresets(const QString& filePath)
@@ -352,8 +352,8 @@ void RedmiOSD::showOSD(const QString& message)
 {
     QDialog* dialog = new QDialog();
     dialog->setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
-    dialog->setAttribute(Qt::WA_TranslucentBackground);
     dialog->setAttribute(Qt::WA_TransparentForMouseEvents);
+    dialog->setAttribute(Qt::WA_TranslucentBackground);
     dialog->setFixedSize(200, 200);
 
     QLabel* label = new QLabel(message, dialog);
@@ -411,9 +411,11 @@ void RedmiOSD::createWindow()
 
     m_silenceKeySequence = new QKeySequenceEdit();
     m_silenceKeySequence->setKeySequence(m_presets.shorcutsMap["silence"]);
+    m_silenceKeySequence->setClearButtonEnabled(true);
 
     m_turboKeySequence = new QKeySequenceEdit();
     m_turboKeySequence->setKeySequence(m_presets.shorcutsMap["turbo"]);
+    m_turboKeySequence->setClearButtonEnabled(true);
 
     horizontalLayout1->addWidget(new QLabel("Active Preset :"));
     horizontalLayout1->addWidget(m_activeLabel);
