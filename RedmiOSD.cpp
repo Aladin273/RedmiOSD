@@ -24,6 +24,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QDateTime>
+#include <QDesktopServices>
 
 RedmiOSD::RedmiOSD()
 {
@@ -52,16 +53,15 @@ RedmiOSD::RedmiOSD()
     connect(m_trayIcon, &QSystemTrayIcon::activated, this, &RedmiOSD::trayActivated);
     
     connect(m_defaultComboBox, &QComboBox::currentTextChanged, this, &RedmiOSD::defaultComboBoxChanged);
-    
     connect(m_updateRateSpinBox, &QSpinBox::valueChanged, this, &RedmiOSD::updateRateTimeSpinBoxChanged);
+
+    connect(m_liveEditCheckBox, &QAbstractButton::toggled, this, &RedmiOSD::liveEditCheckBoxToggled);
     connect(m_overlayCheckBox, &QAbstractButton::toggled, this, &RedmiOSD::overlayCheckBoxToggled);
     connect(m_trayCheckBox, &QAbstractButton::toggled, this, &RedmiOSD::trayCheckBoxToggled);
     
+    connect(m_presetsButton, &QPushButton::clicked, this, &RedmiOSD::presetsButtonClicked);
     connect(m_silenceButton, &QPushButton::clicked, this, &RedmiOSD::silenceButtonClicked);
     connect(m_turboButton, &QPushButton::clicked, this, &RedmiOSD::turboButtonClicked);
-    
-    connect(m_silenceKeySequence, &QKeySequenceEdit::keySequenceChanged, [this](const QKeySequence& keySequence) { m_updateTimer.stop(); });
-    connect(m_turboKeySequence, &QKeySequenceEdit::keySequenceChanged, [this](const QKeySequence& keySequence) { m_updateTimer.stop(); });
 
     connect(m_silenceKeySequence, &QKeySequenceEdit::editingFinished, this, &RedmiOSD::silenceKeySequenceFinished);
     connect(m_turboKeySequence, &QKeySequenceEdit::editingFinished, this, &RedmiOSD::turboKeySequenceFinished);
@@ -120,6 +120,12 @@ void RedmiOSD::updateRateTimeSpinBoxChanged(int value)
     m_updateTimer.start(m_presets.updateRate);
 }
 
+void RedmiOSD::liveEditCheckBoxToggled(bool checked)
+{
+    m_presets.liveEdit = checked;
+    writePresets(m_filePath);
+}
+
 void RedmiOSD::overlayCheckBoxToggled(bool checked)
 {
     m_presets.showOverlay = checked;
@@ -138,6 +144,11 @@ void RedmiOSD::trayCheckBoxToggled(bool checked)
     m_trayIcon->setToolTip(presetName);
 
     m_trayIcon->setVisible(checked);
+}
+
+void RedmiOSD::presetsButtonClicked()
+{
+    QDesktopServices::openUrl(QUrl(m_filePath));
 }
 
 void RedmiOSD::silenceButtonClicked()
@@ -178,9 +189,7 @@ void RedmiOSD::silenceKeySequenceFinished()
     writePresets(m_filePath);
     
     m_silenceShortcut.setShortcut(QKeySequence(m_presets.shorcutsMap["silence"]), true);
-    setFocus();
-
-    m_updateTimer.start(m_presets.updateRate);
+    m_silenceKeySequence->clearFocus();
 }
 
 void RedmiOSD::turboKeySequenceFinished()
@@ -189,9 +198,7 @@ void RedmiOSD::turboKeySequenceFinished()
     writePresets(m_filePath);
 
     m_turboShortcut.setShortcut(QKeySequence(m_presets.shorcutsMap["turbo"]), true);
-    setFocus();
-
-    m_updateTimer.start(m_presets.updateRate);
+    m_turboKeySequence->clearFocus();
 }
 
 void RedmiOSD::readPresets(const QString& filePath)
@@ -236,6 +243,7 @@ void RedmiOSD::readPresets(const QString& filePath)
     m_presets.defaultPreset = rootObject["defaultPreset"].toString();
     m_presets.lastPreset = rootObject["lastPreset"].toString();
     m_presets.updateRate = rootObject["updateRate"].toInt();
+    m_presets.liveEdit = rootObject["liveEdit"].toBool();
     m_presets.showTray = rootObject["showTray"].toBool();
     m_presets.showOverlay = rootObject["showOverlay"].toBool();
 
@@ -304,6 +312,7 @@ void RedmiOSD::writePresets(const QString& filePath)
     rootObject["defaultPreset"] = m_presets.defaultPreset;
     rootObject["lastPreset"] = m_presets.lastPreset;
     rootObject["updateRate"] = m_presets.updateRate;
+    rootObject["liveEdit"] = m_presets.liveEdit;
     rootObject["showTray"] = m_presets.showTray;
     rootObject["showOverlay"] = m_presets.showOverlay;
 
@@ -337,25 +346,29 @@ void RedmiOSD::applyPreset(const QStringList& args)
 
 void RedmiOSD::updatePresets()
 {
-    readPresets(m_filePath);
+    if (m_presets.liveEdit)
+    {
+        readPresets(m_filePath);
+
+        QString lastPresetName = m_presets.lastPreset;
+        QString defaultPresetName = m_presets.defaultPreset;
+        lastPresetName.front() = lastPresetName.front().toUpper();
+        defaultPresetName.front() = defaultPresetName.front().toUpper();
+
+        m_activeLabel->setText(lastPresetName);
+        m_defaultComboBox->setCurrentText(defaultPresetName);
+        m_updateRateSpinBox->setValue(m_presets.updateRate);
+        m_overlayCheckBox->setChecked(m_presets.showOverlay);
+        m_trayCheckBox->setChecked(m_presets.showTray);
+
+        m_silenceKeySequence->setKeySequence(m_presets.shorcutsMap["silence"]);
+        m_turboKeySequence->setKeySequence(m_presets.shorcutsMap["turbo"]);
+
+        m_trayIcon->setIcon(QIcon(QString("Resources/%1.png").arg(lastPresetName)));
+        m_trayIcon->setToolTip(lastPresetName);
+    }
+
     applyPreset(m_presets.argsMap[m_presets.lastPreset]);
-    
-    QString lastPresetName = m_presets.lastPreset;
-    QString defaultPresetName = m_presets.defaultPreset;
-    lastPresetName.front() = lastPresetName.front().toUpper();
-    defaultPresetName.front() = defaultPresetName.front().toUpper();
-    
-    m_activeLabel->setText(lastPresetName);
-    m_defaultComboBox->setCurrentText(defaultPresetName);
-    m_updateRateSpinBox->setValue(m_presets.updateRate);
-    m_overlayCheckBox->setChecked(m_presets.showOverlay);
-    m_trayCheckBox->setChecked(m_presets.showTray);
-    
-    m_silenceKeySequence->setKeySequence(m_presets.shorcutsMap["silence"]);
-    m_turboKeySequence->setKeySequence(m_presets.shorcutsMap["turbo"]);
-    
-    m_trayIcon->setIcon(QIcon(QString("Resources/%1.png").arg(lastPresetName)));
-    m_trayIcon->setToolTip(lastPresetName);
 }
 
 void RedmiOSD::showOSD(const QString& message)
@@ -407,11 +420,20 @@ void RedmiOSD::createWindow()
     m_updateRateSpinBox->setMaximum(60000);
     m_updateRateSpinBox->setValue(m_presets.updateRate);
 
+    m_liveEditCheckBox = new QCheckBox("Live Edit");
+    m_liveEditCheckBox->setChecked(m_presets.liveEdit);
+    m_liveEditCheckBox->setFixedSize(96, 24);
+
     m_overlayCheckBox = new QCheckBox("Show Overlay");
     m_overlayCheckBox->setChecked(m_presets.showOverlay);
+    m_overlayCheckBox->setFixedSize(96, 24);
 
     m_trayCheckBox = new QCheckBox("Show Tray");
     m_trayCheckBox->setChecked(m_presets.showTray);
+    m_trayCheckBox->setFixedSize(96, 24);
+
+    m_presetsButton = new QPushButton("Presets.json");
+    m_presetsButton->setFixedSize(78, 24);
 
     m_silenceButton = new QPushButton("Silence");
     m_silenceButton->setFixedSize(96, 24);
@@ -436,8 +458,8 @@ void RedmiOSD::createWindow()
 
     horizontalLayout2->addWidget(new QLabel("Update Rate (ms) :"));
     horizontalLayout2->addWidget(m_updateRateSpinBox);
-    horizontalLayout2->addWidget(m_overlayCheckBox);
-    horizontalLayout2->addWidget(m_trayCheckBox);
+    horizontalLayout2->addWidget(m_presetsButton);
+    horizontalLayout2->addWidget(m_liveEditCheckBox);
 
     QLabel* silenceLabel = new QLabel();
     silenceLabel->setFixedSize(24, 24);
@@ -445,6 +467,7 @@ void RedmiOSD::createWindow()
     horizontalLayout3->addWidget(silenceLabel);
     horizontalLayout3->addWidget(m_silenceButton);
     horizontalLayout3->addWidget(m_silenceKeySequence);
+    horizontalLayout3->addWidget(m_overlayCheckBox);
 
     QLabel* turboLabel = new QLabel();
     turboLabel->setFixedSize(24, 24);
@@ -452,18 +475,19 @@ void RedmiOSD::createWindow()
     horizontalLayout4->addWidget(turboLabel);
     horizontalLayout4->addWidget(m_turboButton);
     horizontalLayout4->addWidget(m_turboKeySequence);
+    horizontalLayout4->addWidget(m_trayCheckBox);
 
     mainLayout->addLayout(horizontalLayout1);
-    mainLayout->addSpacerItem(new QSpacerItem(0, 10));
+    mainLayout->addSpacerItem(new QSpacerItem(0, 5));
     mainLayout->addLayout(horizontalLayout2);
-    mainLayout->addSpacerItem(new QSpacerItem(0, 10));
+    mainLayout->addSpacerItem(new QSpacerItem(0, 5));
     mainLayout->addLayout(horizontalLayout3);
     mainLayout->addSpacerItem(new QSpacerItem(0, 5));
     mainLayout->addLayout(horizontalLayout4);
 
     setWindowIcon(QIcon("Resources/Default.png"));
     setWindowTitle("RedmiOSD");
-    setFixedSize(400, 150);
+    setFixedSize(415, 150);
     setLayout(mainLayout);
 }
 

@@ -5,27 +5,26 @@
             "shortcut": "Ctrl+Alt+PgDown",
             "args": {
                 "stapm-limit": 15000,
-                "fast-limit": 35000,
-                "slow-limit": 30000,
-                "tctl-temp": 90,
-                "apu-skin-temp": 36
+                "fast-limit": 15000,
+                "slow-limit": 15000,
+                "tctl-temp": 90
             }
         },
         {
             "name": "turbo",
             "shortcut": "Ctrl+Alt+PgUp",
             "args": {
-                "stapm-limit": 65000,
-                "fast-limit": 65000,
+                "stapm-limit": 54000,
+                "fast-limit": 54000,
                 "slow-limit": 54000,
-                "tctl-temp": 98,
-                "apu-skin-temp": 45
+                "tctl-temp": 90
             }
         }
     ],
     "defaultPreset": "silence",
     "lastPreset": "silence",
-    "updateRate": 5000,
+    "updateRate": 1000,
+    "liveEdit": false,
     "showTray": true,
     "showOverlay": true
 }

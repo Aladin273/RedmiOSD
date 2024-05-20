@@ -25,6 +25,7 @@ struct Presets
     QString defaultPreset;
     QString lastPreset;
     int32_t updateRate;
+    bool liveEdit;
     bool showTray;
     bool showOverlay;
 };
@@ -44,9 +45,12 @@ private slots:
     
     void defaultComboBoxChanged(const QString& text);
     void updateRateTimeSpinBoxChanged(int value);
+
+    void liveEditCheckBoxToggled(bool checked);
     void overlayCheckBoxToggled(bool checked);
     void trayCheckBoxToggled(bool checked);
-    
+
+    void presetsButtonClicked();
     void silenceButtonClicked();
     void turboButtonClicked();
 
@@ -72,8 +76,11 @@ private:
     QComboBox* m_defaultComboBox;
     
     QSpinBox* m_updateRateSpinBox;
+    QCheckBox* m_liveEditCheckBox;
     QCheckBox* m_overlayCheckBox;
     QCheckBox* m_trayCheckBox;
+
+    QPushButton* m_presetsButton;
 
     QPushButton* m_silenceButton;
     QPushButton* m_turboButton;
@@ -84,8 +91,8 @@ private:
     QHotkey m_silenceShortcut;
     QHotkey m_turboShortcut;
 
+    QTimer m_updateTimer;
+
     Presets m_presets;
     QString m_filePath = "Presets.json";
-    
-    QTimer m_updateTimer;
 };
