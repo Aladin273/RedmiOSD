@@ -17,5 +17,8 @@
             }
         }
     ],
-    "active": "silence"
+    "defaultPreset": "silence",
+    "lastPreset": "silence",
+    "showTray": true,
+    "shortCut": ""
 }

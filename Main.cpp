@@ -1,5 +1,6 @@
 #include <QApplication>
 #include <QMessageBox>
+
 #include "RedmiOSD.h"
 
 int main(int argc, char *argv[])

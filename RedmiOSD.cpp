@@ -22,34 +22,44 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QDateTime>
 
 RedmiOSD::RedmiOSD()
 {
+    m_presets = readPresets(m_filePath);
+
+    if (m_presets.defaultPreset != "lastPreset")
+    {
+        m_presets.lastPreset = m_presets.defaultPreset;
+        writePresets(m_filePath);
+    }
+
+    QString presetName = m_presets.lastPreset;
+    presetName.front() = presetName.front().toUpper();
+
+    applyPreset(m_presets.argsMap[m_presets.lastPreset]);
+    showOSD(presetName);
+
     createWindow();
     createTray();
 
-    connect(silenceButton, &QPushButton::clicked, this, &RedmiOSD::silenceButtonClicked);
-    connect(turboButton, &QPushButton::clicked, this, &RedmiOSD::turboButtonClicked);
-    connect(shortcutKeySequence, &QKeySequenceEdit::keySequenceChanged, this, &RedmiOSD::shortcutKeySequenceChanged);
-    connect(showTrayCheckBox, &QAbstractButton::toggled, trayIcon, &QSystemTrayIcon::setVisible);
-    connect(trayIcon, &QSystemTrayIcon::activated, this, &RedmiOSD::trayActivated);
-
-    setWindowIcon(QIcon(":/Resources/main.png"));
+    setWindowIcon(QIcon("Resources/Main.png"));
     setWindowTitle("RedmiOSD");
     setFixedSize(400, 100);
 
-    auto presets = readPresets("Presets.json");
-    auto activePreset = readActivePreset("Presets.json");
-    applyPreset(presets[activePreset]);
-    showOSD(activePreset.toUpper());
+    m_trayIcon->setIcon(QIcon(QString("Resources/%1.png").arg(presetName)));
+    m_trayIcon->setToolTip(presetName);
+    m_trayIcon->show();
 
-    QIcon icon(QString(":/Resources/%1.png").arg(activePreset));
-    trayIcon->setIcon(icon);
-    trayIcon->setToolTip(activePreset.toUpper());
-    trayIcon->show();
+    connect(m_trayIcon, &QSystemTrayIcon::activated, this, &RedmiOSD::trayActivated);
+    connect(m_silenceButton, &QPushButton::clicked, this, &RedmiOSD::silenceButtonClicked);
+    connect(m_turboButton, &QPushButton::clicked, this, &RedmiOSD::turboButtonClicked);
+    connect(m_defaultComboBox, &QComboBox::currentTextChanged, this, &RedmiOSD::defaultComboBoxChanged);
+    connect(m_shortcutKeySequence, &QKeySequenceEdit::keySequenceChanged, this, &RedmiOSD::shortcutKeySequenceChanged);
+    connect(m_trayCheckBox, &QAbstractButton::toggled, this, &RedmiOSD::trayCheckBoxToggled);
+    connect(&m_updateTimer, &QTimer::timeout, this, &RedmiOSD::updatePresets);
 
-    connect(&updateTimer, &QTimer::timeout, this, &RedmiOSD::updatePreset);
-    updateTimer.start(1000);
+    m_updateTimer.start(m_updateRate);
 }
 
 void RedmiOSD::closeEvent(QCloseEvent *event)
@@ -57,39 +67,11 @@ void RedmiOSD::closeEvent(QCloseEvent *event)
     if (!event->spontaneous() || !isVisible())
         return;
     
-    if (trayIcon->isVisible()) 
+    if (m_trayIcon->isVisible()) 
     {
         hide();
         event->ignore();
     }
-}
-
-void RedmiOSD::showOSD(const QString& message)
-{
-    QDialog* dialog = new QDialog();
-    dialog->setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
-    dialog->setAttribute(Qt::WA_TranslucentBackground);
-    dialog->setAttribute(Qt::WA_TransparentForMouseEvents);
-    dialog->setFixedSize(200, 200);
-
-    QLabel* label = new QLabel(message);
-    label->setAlignment(Qt::AlignCenter);
-    label->setStyleSheet("font-size: 24pt;");
-
-    QVBoxLayout* layout = new QVBoxLayout();
-    layout->addWidget(label);
-    dialog->setLayout(layout);
-
-    dialog->setStyleSheet("background-color: rgba(0, 0, 0, 150); color: white;");
-
-    dialog->show();
-    QTimer::singleShot(1000, dialog, &QDialog::close);
-}
-
-void RedmiOSD::updatePreset()
-{
-    auto presets = readPresets("Presets.json");
-    applyPreset(presets[readActivePreset("Presets.json")]);
 }
 
 void RedmiOSD::trayActivated(QSystemTrayIcon::ActivationReason reason)
@@ -110,78 +92,57 @@ void RedmiOSD::trayActivated(QSystemTrayIcon::ActivationReason reason)
 
 void RedmiOSD::silenceButtonClicked()
 {
-    const auto presets = readPresets("Presets.json");
-    applyPreset(presets["silence"]);
-    writeActivePreset("Presets.json", "silence");
-    showOSD("SILENCE");
+    m_trayIcon->setIcon(QIcon("Resources/Silence.png"));
+    m_trayIcon->setToolTip("Silence");
 
-    QIcon icon(":/Resources/silence.png");
-    trayIcon->setIcon(icon);
-    trayIcon->setToolTip("SILENCE");
+    m_activeLabel->setText("Silence");
+
+    m_presets.lastPreset = "silence";
+    writePresets(m_filePath);
+
+    applyPreset(m_presets.argsMap["silence"]);
+    showOSD("Silence");
 }
 
 void RedmiOSD::turboButtonClicked()
 {
-    const auto presets = readPresets("Presets.json");
-    applyPreset(presets["turbo"]);
-    writeActivePreset("Presets.json", "turbo");
-    showOSD("TURBO");
+    m_trayIcon->setIcon(QIcon("Resources/Turbo.png"));
+    m_trayIcon->setToolTip("Turbo");
 
-    QIcon icon(":/Resources/turbo.png");
-    trayIcon->setIcon(icon);
-    trayIcon->setToolTip("TURBO");
+    m_activeLabel->setText("Turbo");
+
+    m_presets.lastPreset = "turbo";
+    writePresets(m_filePath);
+
+    applyPreset(m_presets.argsMap["turbo"]);
+    showOSD("Turbo");
+}
+
+void RedmiOSD::defaultComboBoxChanged(const QString& text)
+{
+    QString presetName = text;
+    presetName.front() = presetName.front().toLower();
+
+    m_presets.defaultPreset = presetName;
+    writePresets(m_filePath);
 }
 
 void RedmiOSD::shortcutKeySequenceChanged(const QKeySequence& keySequence)
 {
-    // TODO
+    m_presets.shortCut = keySequence.toString();
+    writePresets(m_filePath);
 }
 
-void RedmiOSD::createWindow()
-{   
-    QVBoxLayout* mainLayout = new QVBoxLayout;
-    setLayout(mainLayout);
-
-    QHBoxLayout *horizontalLayout = new QHBoxLayout;
-
-    silenceButton = new QPushButton("Silence");
-    turboButton = new QPushButton("Turbo");
-    
-    shortcutKeySequence = new QKeySequenceEdit();
-    //shortcutKeySequence->setKeySequence(Qt::Key::Key_Delete);
-    
-    showTrayCheckBox = new QCheckBox("Show Tray");
-    showTrayCheckBox->setChecked(true);
-
-    horizontalLayout->addWidget(silenceButton);
-    horizontalLayout->addWidget(turboButton);
-    horizontalLayout->addWidget(shortcutKeySequence);
-    horizontalLayout->addWidget(showTrayCheckBox);
-    
-    mainLayout->addLayout(horizontalLayout);
-}
-
-void RedmiOSD::createTray()
+void RedmiOSD::trayCheckBoxToggled(bool checked)
 {
-    QAction* settingsAction = new QAction("Settings", this);
-    connect(settingsAction, &QAction::triggered, this, &QWidget::showNormal);
+    m_presets.showTray = checked;
+    writePresets(m_filePath);
 
-    QAction*  quitAction = new QAction("Quit", this);
-    connect(quitAction, &QAction::triggered, qApp, &QCoreApplication::quit);
-
-    QMenu* trayIconMenu = new QMenu(this);
-    trayIconMenu->addAction(settingsAction);
-    trayIconMenu->addSeparator();
-    trayIconMenu->addAction(quitAction);
-
-    trayIcon = new QSystemTrayIcon(this);
-    trayIcon->setContextMenu(trayIconMenu);
+    m_trayIcon->setVisible(checked);
 }
 
-QMap<QString, QJsonObject> RedmiOSD::readPresets(const QString& filePath)
+Presets RedmiOSD::readPresets(const QString& filePath)
 {
-    QMap<QString, QJsonObject> presetsMap;
-
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) 
     {
@@ -200,11 +161,31 @@ QMap<QString, QJsonObject> RedmiOSD::readPresets(const QString& filePath)
     }
 
     QJsonObject rootObject = jsonDoc.object();
-    if (!rootObject.contains("presets")) 
+
+    if (!rootObject.contains("defaultPreset"))
+    {
+        qDebug() << "Default preset not found in JSON.";
+        return {};
+    }
+
+    if (!rootObject.contains("lastPreset"))
+    {
+        qDebug() << "Last preset not found in JSON.";
+        return {};
+    }
+
+    if (!rootObject.contains("presets"))
     {
         qDebug() << "Presets array not found in JSON.";
         return {};
     }
+    
+    Presets presets;
+
+    presets.defaultPreset = rootObject["defaultPreset"].toString();
+    presets.lastPreset = rootObject["lastPreset"].toString();
+    presets.showTray = rootObject["showTray"].toBool();
+    presets.shortCut = rootObject["shortCut"].toString();
 
     QJsonArray presetsArray = rootObject["presets"].toArray();
     for (const QJsonValue& presetValue : presetsArray) 
@@ -218,63 +199,22 @@ QMap<QString, QJsonObject> RedmiOSD::readPresets(const QString& filePath)
         QJsonObject presetObject = presetValue.toObject();
         QString presetName = presetObject["name"].toString();
         QJsonObject argsObject = presetObject["args"].toObject();
+
+        QStringList argsList;
+
+        for (auto it = argsObject.constBegin(); it != argsObject.constEnd(); ++it)
+            argsList << QString("--%1=%2").arg(it.key()).arg(it.value().toInt());
         
-        presetsMap.insert(presetName, argsObject);
+        presets.argsMap.insert(presetName, argsList);
     }
 
-    return presetsMap;
+    return presets;
 }
 
-void RedmiOSD::applyPreset(const QJsonObject& args) 
-{
-    qDebug() << "\nApplied with ryzenadj :";
-
-    QStringList argsList;
-    for (auto it = args.constBegin(); it != args.constEnd(); ++it) 
-    {
-        qDebug() << it.key() << " : " << it.value().toInt();
-        argsList << QString("--%1=%2").arg(it.key()).arg(it.value().toInt());
-    }
-
-    QProcess* process = new QProcess();
-
-    QObject::connect(process, &QProcess::finished, process, &QProcess::deleteLater);
-    process->start("Tools/ryzenadj.exe", argsList);
-}
-
-QString RedmiOSD::readActivePreset(const QString& filePath) 
+void RedmiOSD::writePresets(const QString& filePath)
 {
     QFile file(filePath);
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) 
-    {
-        qDebug() << "Failed to open file:" << file.errorString();
-        return "";
-    }
-
-    QByteArray jsonData = file.readAll();
-    file.close();
-
-    QJsonDocument jsonDoc = QJsonDocument::fromJson(jsonData);
-    if (jsonDoc.isNull() || !jsonDoc.isObject()) 
-    {
-        qDebug() << "Invalid JSON data.";
-        return "";
-    }
-
-    QJsonObject rootObject = jsonDoc.object();
-    if (!rootObject.contains("active")) 
-    {
-        qDebug() << "Active preset not found in JSON.";
-        return "";
-    }
-
-    return rootObject["active"].toString();
-}
-
-void RedmiOSD::writeActivePreset(const QString& filePath, const QString& presetName) 
-{
-    QFile file(filePath);
-    if (!file.open(QIODevice::ReadWrite | QIODevice::Text)) 
+    if (!file.open(QIODevice::ReadWrite | QIODevice::Text))
     {
         qDebug() << "Failed to open file:" << file.errorString();
         return;
@@ -284,14 +224,18 @@ void RedmiOSD::writeActivePreset(const QString& filePath, const QString& presetN
     file.close();
 
     QJsonDocument jsonDoc = QJsonDocument::fromJson(jsonData);
-    if (jsonDoc.isNull() || !jsonDoc.isObject()) 
+    if (jsonDoc.isNull() || !jsonDoc.isObject())
     {
         qDebug() << "Invalid JSON data.";
         return;
     }
 
     QJsonObject rootObject = jsonDoc.object();
-    rootObject["active"] = presetName;
+
+    rootObject["defaultPreset"] = m_presets.defaultPreset;
+    rootObject["lastPreset"] = m_presets.lastPreset;
+    rootObject["showTray"] = m_presets.showTray;
+    rootObject["shortCut"] = m_presets.shortCut;
 
     jsonDoc.setObject(rootObject);
 
@@ -302,13 +246,111 @@ void RedmiOSD::writeActivePreset(const QString& filePath, const QString& presetN
         return;
     }
 
-    qint64 bytesWritten = file.write(jsonDoc.toJson());
-    if (bytesWritten == -1)
-    {
-        qDebug() << "Failed to write JSON data to file:" << file.errorString();
-        return;
-    }
-
-    qDebug() << "Active preset updated successfully:" << presetName;
+    file.write(jsonDoc.toJson());
     file.close();
+
+    qDebug() << "File updated successfully:" << filePath;
+}
+
+void RedmiOSD::applyPreset(const QStringList& args)
+{
+    qDebug() << "\nApplied with ryzenadj at" << QDateTime::currentDateTime().toString();
+    
+    for (const auto& arg : args)
+        qDebug() << arg;
+    
+    QProcess* process = new QProcess();
+    process->start("Tools/ryzenadj.exe", args);
+
+    connect(process, &QProcess::finished, process, &QProcess::deleteLater);
+}
+
+void RedmiOSD::updatePresets()
+{
+    m_presets = readPresets(m_filePath);
+    applyPreset(m_presets.argsMap[m_presets.lastPreset]);
+}
+
+void RedmiOSD::showOSD(const QString& message)
+{
+    QDialog* dialog = new QDialog();
+    dialog->setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
+    dialog->setAttribute(Qt::WA_TranslucentBackground);
+    dialog->setAttribute(Qt::WA_TransparentForMouseEvents);
+    dialog->setFixedSize(200, 200);
+
+    QLabel* label = new QLabel(message, dialog);
+    label->setAlignment(Qt::AlignCenter);
+    label->setStyleSheet("font-size: 24pt;");
+
+    QVBoxLayout* layout = new QVBoxLayout(dialog);
+    layout->addWidget(label);
+    dialog->setLayout(layout);
+
+    dialog->setStyleSheet("background-color: rgba(0, 0, 0, 150); color: white;");
+
+    dialog->show();
+    QTimer::singleShot(1000, dialog, &QDialog::deleteLater);
+}
+
+void RedmiOSD::createWindow()
+{
+    QString lastPresetName = m_presets.lastPreset;
+    QString defaultPresetName = m_presets.defaultPreset;
+    lastPresetName.front() = lastPresetName.front().toUpper();
+    defaultPresetName.front() = defaultPresetName.front().toUpper();
+
+    QVBoxLayout* mainLayout = new QVBoxLayout;
+    setLayout(mainLayout);
+
+    QHBoxLayout* horizontalLayout1 = new QHBoxLayout;
+    QHBoxLayout* horizontalLayout2 = new QHBoxLayout;
+
+    m_activeLabel = new QLabel(lastPresetName);
+    m_activeLabel->setStyleSheet("font-weight: bold;");
+
+    m_defaultComboBox = new QComboBox();
+    m_defaultComboBox->addItem("Silence");
+    m_defaultComboBox->addItem("Turbo");
+    m_defaultComboBox->addItem("LastPreset");
+    m_defaultComboBox->setCurrentText(defaultPresetName);
+
+    m_trayCheckBox = new QCheckBox("Show Tray");
+    m_trayCheckBox->setChecked(m_presets.showTray);
+
+    m_silenceButton = new QPushButton("Silence");
+    m_turboButton = new QPushButton("Turbo");
+
+    m_shortcutKeySequence = new QKeySequenceEdit();
+    m_shortcutKeySequence->setKeySequence(m_presets.shortCut);
+
+    horizontalLayout1->addWidget(new QLabel("Active Preset :"));
+    horizontalLayout1->addWidget(m_activeLabel);
+    horizontalLayout1->addWidget(new QLabel("Default Preset :"));
+    horizontalLayout1->addWidget(m_defaultComboBox);
+    horizontalLayout1->addWidget(m_trayCheckBox);
+
+    horizontalLayout2->addWidget(m_silenceButton);
+    horizontalLayout2->addWidget(m_turboButton);
+    horizontalLayout2->addWidget(m_shortcutKeySequence);
+
+    mainLayout->addLayout(horizontalLayout1);
+    mainLayout->addLayout(horizontalLayout2);
+}
+
+void RedmiOSD::createTray()
+{
+    QAction* settingsAction = new QAction(QIcon("Resources/Main.png"), "Settings", this);
+    connect(settingsAction, &QAction::triggered, this, &QWidget::show);
+
+    QAction* quitAction = new QAction(QIcon("Resources/Quit.png"), "Quit", this);
+    connect(quitAction, &QAction::triggered, qApp, &QCoreApplication::quit);
+
+    QMenu* trayIconMenu = new QMenu(this);
+    trayIconMenu->addAction(settingsAction);
+    trayIconMenu->addSeparator();
+    trayIconMenu->addAction(quitAction);
+
+    m_trayIcon = new QSystemTrayIcon(this);
+    m_trayIcon->setContextMenu(trayIconMenu);
 }

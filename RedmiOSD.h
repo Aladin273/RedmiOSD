@@ -3,6 +3,7 @@
 #include <QSystemTrayIcon>
 #include <QDialog>
 #include <QTimer>
+#include <QKeyEvent>
 
 QT_BEGIN_NAMESPACE
 class QAction;
@@ -18,7 +19,17 @@ class QTextEdit;
 class QKeySequenceEdit;
 class QVBoxLayout;
 class QTimer;
+class QProcess;
 QT_END_NAMESPACE
+
+struct Presets
+{
+    QMap<QString, QStringList> argsMap;
+    QString defaultPreset;
+    QString lastPreset;
+    bool showTray;
+    QString shortCut;
+};
 
 class RedmiOSD : public QDialog
 {
@@ -29,31 +40,40 @@ public:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
-    
-    void showOSD(const QString& message);
-    void updatePreset();
 
 private slots:
     void trayActivated(QSystemTrayIcon::ActivationReason reason);
+
     void silenceButtonClicked();
     void turboButtonClicked();
+    void defaultComboBoxChanged(const QString& text);
     void shortcutKeySequenceChanged(const QKeySequence& keySequence);
+    void trayCheckBoxToggled(bool checked);
 
 private:
+    Presets readPresets(const QString& filePath);
+    void writePresets(const QString& filePath);
+    
+    void applyPreset(const QStringList& args);
+    void updatePresets();
+
+    void showOSD(const QString& message);
+
     void createWindow();
     void createTray();
 
-    QMap<QString, QJsonObject> readPresets(const QString& presetsPath);
-    void applyPreset(const QJsonObject& args);
+    QSystemTrayIcon* m_trayIcon;
 
-    QString readActivePreset(const QString& filePath);
-    void writeActivePreset(const QString& filePath, const QString& presetName);
+    QLabel* m_activeLabel;
+    QPushButton* m_silenceButton;
+    QPushButton* m_turboButton;
+    QComboBox* m_defaultComboBox;
+    QKeySequenceEdit* m_shortcutKeySequence;
+    QCheckBox* m_trayCheckBox;
 
-    QPushButton* silenceButton;
-    QPushButton* turboButton;
-    QKeySequenceEdit* shortcutKeySequence;
-    QCheckBox *showTrayCheckBox;
-
-    QTimer updateTimer;
-    QSystemTrayIcon *trayIcon;
+    Presets m_presets;
+    QString m_filePath = "Presets.json";
+    
+    QTimer m_updateTimer;
+    int32_t m_updateRate = 5000;
 };
