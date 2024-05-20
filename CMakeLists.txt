@@ -1,11 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 project(RedmiOSD LANGUAGES CXX)
 
-include(CMake/qt.cmake)
-
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core)
-find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Core Gui Widgets)
-
+find_package(Qt6 COMPONENTS Core Gui Widgets)
 qt_standard_project_setup()
 
 set(REDMI_OSD_HEADERS
