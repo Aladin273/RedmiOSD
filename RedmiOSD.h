@@ -11,6 +11,7 @@ class QComboBox;
 class QCheckBox;
 class QPushButton;
 class QKeySequenceEdit;
+class QSpinBox;
 class QAction;
 class QMenu;
 class QTimer;
@@ -23,7 +24,9 @@ struct Presets
     QMap<QString, QString> shorcutsMap;
     QString defaultPreset;
     QString lastPreset;
+    int32_t updateRate;
     bool showTray;
+    bool showOverlay;
 };
 
 class RedmiOSD : public QDialog
@@ -40,6 +43,8 @@ private slots:
     void trayActivated(QSystemTrayIcon::ActivationReason reason);
     
     void defaultComboBoxChanged(const QString& text);
+    void updateRateTimeSpinBoxChanged(int value);
+    void overlayCheckBoxToggled(bool checked);
     void trayCheckBoxToggled(bool checked);
     
     void silenceButtonClicked();
@@ -65,6 +70,9 @@ private:
     
     QLabel* m_activeLabel;
     QComboBox* m_defaultComboBox;
+    
+    QSpinBox* m_updateRateSpinBox;
+    QCheckBox* m_overlayCheckBox;
     QCheckBox* m_trayCheckBox;
 
     QPushButton* m_silenceButton;
@@ -80,5 +88,4 @@ private:
     QString m_filePath = "Presets.json";
     
     QTimer m_updateTimer;
-    int32_t m_updateRate = 5000;
 };

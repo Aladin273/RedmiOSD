@@ -25,5 +25,7 @@
     ],
     "defaultPreset": "silence",
     "lastPreset": "silence",
-    "showTray": true
+    "updateRate": 5000,
+    "showTray": true,
+    "showOverlay": true
 }
