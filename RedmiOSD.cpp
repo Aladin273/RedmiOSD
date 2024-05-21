@@ -25,26 +25,13 @@
 #include <QJsonObject>
 #include <QDateTime>
 #include <QDesktopServices>
+#include <QSettings>
 
 RedmiOSD::RedmiOSD()
 {
     readPresets(m_filePath);
     
-    if (m_presets.defaultPreset != "lastPreset")
-    {
-        m_presets.lastPreset = m_presets.defaultPreset;
-        writePresets(m_filePath);
-    }
-
-    if (m_presets.showOverlay)
-    {
-        QString presetName = m_presets.lastPreset;
-        presetName.front() = presetName.front().toUpper();
-
-        showOSD(presetName);
-    }
-
-    applyPreset(m_presets.argsMap[m_presets.lastPreset]);
+    initPreset();
 
     createWindow();
     createTray();
@@ -55,6 +42,7 @@ RedmiOSD::RedmiOSD()
     connect(m_defaultComboBox, &QComboBox::currentTextChanged, this, &RedmiOSD::defaultComboBoxChanged);
     connect(m_updateRateSpinBox, &QSpinBox::valueChanged, this, &RedmiOSD::updateRateTimeSpinBoxChanged);
 
+    connect(m_startupCheckBox, &QAbstractButton::toggled, this, &RedmiOSD::startupCheckBoxToggled);
     connect(m_liveEditCheckBox, &QAbstractButton::toggled, this, &RedmiOSD::liveEditCheckBoxToggled);
     connect(m_overlayCheckBox, &QAbstractButton::toggled, this, &RedmiOSD::overlayCheckBoxToggled);
     connect(m_trayCheckBox, &QAbstractButton::toggled, this, &RedmiOSD::trayCheckBoxToggled);
@@ -69,9 +57,22 @@ RedmiOSD::RedmiOSD()
     connect(&m_silenceShortcut, &QHotkey::activated, this, &RedmiOSD::silenceButtonClicked);
     connect(&m_turboShortcut, &QHotkey::activated, this, &RedmiOSD::turboButtonClicked);
     
-    connect(&m_updateTimer, &QTimer::timeout, this, &RedmiOSD::updatePresets);
+    connect(&m_updatePresetTimer, &QTimer::timeout, this, &RedmiOSD::updatePreset);
+    connect(&m_updateLiveEditTimer, &QTimer::timeout, this, &RedmiOSD::updateLiveEdit);
 
-    m_updateTimer.start(m_presets.updateRate);
+    applyPreset(m_presets.argsMap[m_presets.lastPreset]);
+    applyStartup(m_presets.startup);
+
+    if (m_presets.showOverlay)
+        showOSD(formatToUpper(m_presets.lastPreset));
+
+    if (m_presets.showTray)
+        m_trayIcon->show();
+
+    if (m_presets.liveEdit) 
+        m_updateLiveEditTimer.start(1000);
+    
+    m_updatePresetTimer.start(m_presets.updateRate);
 }
 
 void RedmiOSD::closeEvent(QCloseEvent *event)
@@ -104,10 +105,7 @@ void RedmiOSD::trayActivated(QSystemTrayIcon::ActivationReason reason)
 
 void RedmiOSD::defaultComboBoxChanged(const QString& text)
 {
-    QString presetName = text;
-    presetName.front() = presetName.front().toLower();
-
-    m_presets.defaultPreset = presetName;
+    m_presets.defaultPreset = formatToLower(text);
     writePresets(m_filePath);
 }
 
@@ -116,14 +114,29 @@ void RedmiOSD::updateRateTimeSpinBoxChanged(int value)
     m_presets.updateRate = value;
     writePresets(m_filePath);
 
-    m_updateTimer.stop();
-    m_updateTimer.start(m_presets.updateRate);
+    m_updatePresetTimer.stop();
+    m_updatePresetTimer.start(m_presets.updateRate);
+}
+
+void RedmiOSD::startupCheckBoxToggled(bool checked)
+{
+    m_presets.startup = checked;
+    writePresets(m_filePath);
+
+    applyStartup(checked);
 }
 
 void RedmiOSD::liveEditCheckBoxToggled(bool checked)
 {
+    readPresets(m_filePath);
+    
     m_presets.liveEdit = checked;
     writePresets(m_filePath);
+
+    if (checked)
+        m_updateLiveEditTimer.start(1000);
+    else
+        m_updateLiveEditTimer.stop();
 }
 
 void RedmiOSD::overlayCheckBoxToggled(bool checked)
@@ -137,12 +150,8 @@ void RedmiOSD::trayCheckBoxToggled(bool checked)
     m_presets.showTray = checked;
     writePresets(m_filePath);
 
-    QString presetName = m_presets.lastPreset;
-    presetName.front() = presetName.front().toUpper();
-
-    m_trayIcon->setIcon(QIcon(QString("Resources/%1.png").arg(presetName)));
-    m_trayIcon->setToolTip(presetName);
-
+    m_trayIcon->setIcon(QIcon(QString("Resources/%1.png").arg(formatToUpper(m_presets.lastPreset))));
+    m_trayIcon->setToolTip(formatToUpper(m_presets.lastPreset));
     m_trayIcon->setVisible(checked);
 }
 
@@ -153,34 +162,34 @@ void RedmiOSD::presetsButtonClicked()
 
 void RedmiOSD::silenceButtonClicked()
 {
-    m_trayIcon->setIcon(QIcon("Resources/Silence.png"));
-    m_trayIcon->setToolTip("Silence");
-
-    m_activeLabel->setText("Silence");
-
     m_presets.lastPreset = "silence";
     writePresets(m_filePath);
+
+    applyPreset(m_presets.argsMap["silence"]);
 
     if (m_presets.showOverlay)
         showOSD("Silence");
 
-    applyPreset(m_presets.argsMap["silence"]);
+    m_activeLabel->setText("Silence");
+
+    m_trayIcon->setIcon(QIcon("Resources/Silence.png"));
+    m_trayIcon->setToolTip("Silence");
 }
 
 void RedmiOSD::turboButtonClicked()
 {
-    m_trayIcon->setIcon(QIcon("Resources/Turbo.png"));
-    m_trayIcon->setToolTip("Turbo");
-
-    m_activeLabel->setText("Turbo");
-
     m_presets.lastPreset = "turbo";
     writePresets(m_filePath);
+
+    applyPreset(m_presets.argsMap["turbo"]);
 
     if (m_presets.showOverlay)
         showOSD("Turbo");
 
-    applyPreset(m_presets.argsMap["turbo"]);
+    m_activeLabel->setText("Turbo");
+
+    m_trayIcon->setIcon(QIcon("Resources/Turbo.png"));
+    m_trayIcon->setToolTip("Turbo");
 }
 
 void RedmiOSD::silenceKeySequenceFinished()
@@ -243,6 +252,7 @@ void RedmiOSD::readPresets(const QString& filePath)
     m_presets.defaultPreset = rootObject["defaultPreset"].toString();
     m_presets.lastPreset = rootObject["lastPreset"].toString();
     m_presets.updateRate = rootObject["updateRate"].toInt();
+    m_presets.startup = rootObject["startup"].toBool();
     m_presets.liveEdit = rootObject["liveEdit"].toBool();
     m_presets.showTray = rootObject["showTray"].toBool();
     m_presets.showOverlay = rootObject["showOverlay"].toBool();
@@ -269,6 +279,8 @@ void RedmiOSD::readPresets(const QString& filePath)
         m_presets.argsMap.insert(presetName, argsList);
         m_presets.shorcutsMap.insert(presetName, shortcut);
     }
+
+    qDebug() << "File read successfully:" << filePath;
 }
 
 void RedmiOSD::writePresets(const QString& filePath)
@@ -312,6 +324,7 @@ void RedmiOSD::writePresets(const QString& filePath)
     rootObject["defaultPreset"] = m_presets.defaultPreset;
     rootObject["lastPreset"] = m_presets.lastPreset;
     rootObject["updateRate"] = m_presets.updateRate;
+    rootObject["startup"] = m_presets.startup;
     rootObject["liveEdit"] = m_presets.liveEdit;
     rootObject["showTray"] = m_presets.showTray;
     rootObject["showOverlay"] = m_presets.showOverlay;
@@ -328,7 +341,16 @@ void RedmiOSD::writePresets(const QString& filePath)
     file.write(jsonDoc.toJson());
     file.close();
 
-    qDebug() << "File updated successfully:" << filePath;
+    qDebug() << "File write successfully:" << filePath;
+}
+
+void RedmiOSD::initPreset()
+{
+    if (m_presets.defaultPreset != m_presets.lastPreset && m_presets.defaultPreset != "lastPreset")
+    {
+        m_presets.lastPreset = m_presets.defaultPreset;
+        writePresets(m_filePath);
+    }
 }
 
 void RedmiOSD::applyPreset(const QStringList& args)
@@ -344,31 +366,18 @@ void RedmiOSD::applyPreset(const QStringList& args)
     connect(process, &QProcess::finished, process, &QProcess::deleteLater);
 }
 
-void RedmiOSD::updatePresets()
+void RedmiOSD::applyStartup(bool enable)
 {
-    if (m_presets.liveEdit)
+    if (enable)
     {
-        readPresets(m_filePath);
-
-        QString lastPresetName = m_presets.lastPreset;
-        QString defaultPresetName = m_presets.defaultPreset;
-        lastPresetName.front() = lastPresetName.front().toUpper();
-        defaultPresetName.front() = defaultPresetName.front().toUpper();
-
-        m_activeLabel->setText(lastPresetName);
-        m_defaultComboBox->setCurrentText(defaultPresetName);
-        m_updateRateSpinBox->setValue(m_presets.updateRate);
-        m_overlayCheckBox->setChecked(m_presets.showOverlay);
-        m_trayCheckBox->setChecked(m_presets.showTray);
-
-        m_silenceKeySequence->setKeySequence(m_presets.shorcutsMap["silence"]);
-        m_turboKeySequence->setKeySequence(m_presets.shorcutsMap["turbo"]);
-
-        m_trayIcon->setIcon(QIcon(QString("Resources/%1.png").arg(lastPresetName)));
-        m_trayIcon->setToolTip(lastPresetName);
+        QSettings settings("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", QSettings::NativeFormat);
+        settings.setValue("RedmiOSD", QCoreApplication::applicationFilePath());
     }
-
-    applyPreset(m_presets.argsMap[m_presets.lastPreset]);
+    else
+    {
+        QSettings settings("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", QSettings::NativeFormat);
+        settings.remove("RedmiOSD");
+    }
 }
 
 void RedmiOSD::showOSD(const QString& message)
@@ -393,32 +402,56 @@ void RedmiOSD::showOSD(const QString& message)
     QTimer::singleShot(1000, dialog, &QDialog::deleteLater);
 }
 
+void RedmiOSD::updatePreset()
+{
+    applyPreset(m_presets.argsMap[m_presets.lastPreset]);
+}
+
+void RedmiOSD::updateLiveEdit()
+{
+    readPresets(m_filePath);
+
+    m_activeLabel->setText(formatToUpper(m_presets.lastPreset));
+    m_defaultComboBox->setCurrentText(formatToUpper(m_presets.defaultPreset));
+    m_updateRateSpinBox->setValue(m_presets.updateRate);
+    m_startupCheckBox->setChecked(m_presets.startup);
+    m_liveEditCheckBox->setChecked(m_presets.liveEdit);
+    m_overlayCheckBox->setChecked(m_presets.showOverlay);
+    m_trayCheckBox->setChecked(m_presets.showTray);
+
+    m_silenceKeySequence->setKeySequence(m_presets.shorcutsMap["silence"]);
+    m_turboKeySequence->setKeySequence(m_presets.shorcutsMap["turbo"]);
+
+    m_trayIcon->setIcon(QIcon(QString("Resources/%1.png").arg(formatToUpper(m_presets.lastPreset))));
+    m_trayIcon->setToolTip(formatToUpper(m_presets.lastPreset));
+    m_trayIcon->setVisible(m_presets.showTray);
+}
+
 void RedmiOSD::createWindow()
 {
-    QString lastPresetName = m_presets.lastPreset;
-    QString defaultPresetName = m_presets.defaultPreset;
-    lastPresetName.front() = lastPresetName.front().toUpper();
-    defaultPresetName.front() = defaultPresetName.front().toUpper();
-
     QVBoxLayout* mainLayout = new QVBoxLayout;
     QHBoxLayout* horizontalLayout1 = new QHBoxLayout;
     QHBoxLayout* horizontalLayout2 = new QHBoxLayout;
     QHBoxLayout* horizontalLayout3 = new QHBoxLayout;
     QHBoxLayout* horizontalLayout4 = new QHBoxLayout;
 
-    m_activeLabel = new QLabel(lastPresetName);
+    m_activeLabel = new QLabel(formatToUpper(m_presets.lastPreset));
     m_activeLabel->setStyleSheet("font-weight: bold;");
 
     m_defaultComboBox = new QComboBox();
     m_defaultComboBox->addItem("Silence");
     m_defaultComboBox->addItem("Turbo");
     m_defaultComboBox->addItem("LastPreset");
-    m_defaultComboBox->setCurrentText(defaultPresetName);
+    m_defaultComboBox->setCurrentText(formatToUpper(m_presets.defaultPreset));
 
     m_updateRateSpinBox = new QSpinBox();
     m_updateRateSpinBox->setMinimum(0);
     m_updateRateSpinBox->setMaximum(60000);
     m_updateRateSpinBox->setValue(m_presets.updateRate);
+
+    m_startupCheckBox = new QCheckBox("Startup");
+    m_startupCheckBox->setChecked(m_presets.startup);
+    m_startupCheckBox->setFixedSize(96, 24);
 
     m_liveEditCheckBox = new QCheckBox("Live Edit");
     m_liveEditCheckBox->setChecked(m_presets.liveEdit);
@@ -455,6 +488,7 @@ void RedmiOSD::createWindow()
     horizontalLayout1->addWidget(m_activeLabel);
     horizontalLayout1->addWidget(new QLabel("Default Preset :"));
     horizontalLayout1->addWidget(m_defaultComboBox);
+    horizontalLayout1->addWidget(m_startupCheckBox);
 
     horizontalLayout2->addWidget(new QLabel("Update Rate (ms) :"));
     horizontalLayout2->addWidget(m_updateRateSpinBox);
@@ -493,9 +527,6 @@ void RedmiOSD::createWindow()
 
 void RedmiOSD::createTray()
 {
-    QString presetName = m_presets.lastPreset;
-    presetName.front() = presetName.front().toUpper();
-
     QAction* settingsAction = new QAction(QIcon("Resources/Default.png"), "Settings", this);
     connect(settingsAction, &QAction::triggered, this, &QWidget::show);
 
@@ -510,15 +541,28 @@ void RedmiOSD::createTray()
     m_trayIcon = new QSystemTrayIcon(this);
     m_trayIcon->setContextMenu(trayIconMenu);
 
-    m_trayIcon->setIcon(QIcon(QString("Resources/%1.png").arg(presetName)));
-    m_trayIcon->setToolTip(presetName);
-
-    if (m_presets.showTray)
-        m_trayIcon->show();
+    m_trayIcon->setIcon(QIcon(QString("Resources/%1.png").arg(formatToUpper(m_presets.lastPreset))));
+    m_trayIcon->setToolTip(formatToUpper(m_presets.lastPreset));
 }
 
 void RedmiOSD::createShortcuts()
 {
     m_silenceShortcut.setShortcut(QKeySequence(m_presets.shorcutsMap["silence"]), true);
     m_turboShortcut.setShortcut(QKeySequence(m_presets.shorcutsMap["turbo"]), true);
+}
+
+QString RedmiOSD::formatToUpper(const QString& text)
+{
+    QString formatedText = text;
+    formatedText.front() = formatedText.front().toUpper();
+
+    return formatedText;
+}
+
+QString RedmiOSD::formatToLower(const QString& text)
+{
+    QString formatedText = text;
+    formatedText.front() = formatedText.front().toLower();
+
+    return formatedText;
 }

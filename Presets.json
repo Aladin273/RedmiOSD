@@ -24,6 +24,7 @@
     "defaultPreset": "silence",
     "lastPreset": "silence",
     "updateRate": 1000,
+    "startup": true,
     "liveEdit": false,
     "showTray": true,
     "showOverlay": true
