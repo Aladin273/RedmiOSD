@@ -5,6 +5,8 @@
 #include <QTimer>
 #include <QHotkey>
 
+#include <ryzenadj.h>
+
 QT_BEGIN_NAMESPACE
 class QLabel;
 class QComboBox;
@@ -20,7 +22,7 @@ QT_END_NAMESPACE
 
 struct Presets
 {
-    QMap<QString, QStringList> argsMap;
+    QMap<QString, QMap<QString, int32_t>> argsMap;
     QMap<QString, QString> shorcutsMap;
     QString defaultPreset;
     QString lastPreset;
@@ -37,6 +39,7 @@ class RedmiOSD : public QDialog
 
 public:
     RedmiOSD();
+    virtual ~RedmiOSD();
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -64,7 +67,7 @@ private:
     void writePresets(const QString& filePath);
     
     void initPreset();
-    void applyPreset(const QStringList& args);
+    void applyPreset(const QMap<QString, int32_t>& args);
     void applyStartup(bool enable);
     void showOSD(const QString& message);
     

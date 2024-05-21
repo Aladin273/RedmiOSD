@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.26)
 project(RedmiOSD LANGUAGES CXX)
 
 find_package(Qt6 COMPONENTS Core Gui Widgets)
@@ -25,11 +25,12 @@ set(REDMI_OSD_SOURCES
 qt_add_executable(RedmiOSD ${REDMI_OSD_HEADERS} ${REDMI_OSD_SOURCES} "RedmiOSD.rc")
 #qt_add_resources(RedmiOSD "RedmiOSD" PREFIX "/" FILES ${REDMI_OSD_RESOURCES})
 
-target_link_libraries(RedmiOSD PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets QHotkey::QHotkey)
+target_link_libraries(RedmiOSD PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets QHotkey::QHotkey ryzenadj)
 set_target_properties(RedmiOSD PROPERTIES WIN32_EXECUTABLE TRUE)
 
-add_custom_command(TARGET RedmiOSD POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/Tools ${CMAKE_CURRENT_BINARY_DIR}/Tools)
-add_custom_command(TARGET RedmiOSD POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/Resources ${CMAKE_CURRENT_BINARY_DIR}/Resources)
 add_custom_command(TARGET RedmiOSD POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/Presets.json ${CMAKE_CURRENT_BINARY_DIR}/Presets.json)
 add_custom_command(TARGET RedmiOSD POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/ReadMe.txt ${CMAKE_CURRENT_BINARY_DIR}/ReadMe.txt)
+add_custom_command(TARGET RedmiOSD POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different  ${CMAKE_SOURCE_DIR}/Tools ${CMAKE_CURRENT_BINARY_DIR}/Tools)
+add_custom_command(TARGET RedmiOSD POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different  ${CMAKE_SOURCE_DIR}/Resources ${CMAKE_CURRENT_BINARY_DIR}/Resources)
+add_custom_command(TARGET RedmiOSD POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different  ${RYZENADJ_BIN_PATH} $<TARGET_FILE_DIR:RedmiOSD>) 
 add_custom_command(TARGET RedmiOSD POST_BUILD COMMAND windeployqt6 --no-translations $<TARGET_FILE:RedmiOSD>)

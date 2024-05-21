@@ -27,6 +27,45 @@
 #include <QDesktopServices>
 #include <QSettings>
 
+#include <functional>
+
+int32_t g_fastCache = 0;
+
+int32_t g_slowCache = 0;
+
+ryzen_access g_ryzen;
+
+QMap<QString, std::function<void(ryzen_access, int32_t)>> g_ryzenMapper
+{
+    { "stapm-limit", &set_stapm_limit },
+    { "fast-limit", &set_fast_limit },
+    { "slow-limit", &set_slow_limit },
+    { "slow-time", &set_slow_time },
+    { "stapm-time", &set_stapm_time },
+    { "tctl-temp", &set_tctl_temp },
+    { "vrm-current", &set_vrm_current },
+    { "vrmsoc-current", &set_vrmsoc_current },
+    { "vrmmax-current", &set_vrmmax_current},
+    { "vrmsocmax-current", &set_vrmsocmax_current },
+    { "psi0-current", &set_psi0_current },
+    { "psi0soc-current", &set_psi0soc_current },
+    { "max-socclk-frequency", &set_max_socclk_freq },
+    { "min-socclk-frequency", &set_min_socclk_freq },
+    { "max-fclk-frequency", &set_max_fclk_freq },
+    { "min-fclk-frequency", &set_min_fclk_freq },
+    { "max-vcn", &set_max_vcn },
+    { "min-vcn", &set_min_vcn },
+    { "max-lclk", &set_max_lclk },
+    { "min-lclk", &set_min_lclk },
+    { "max-gfxclk", &set_max_gfxclk_freq },
+    { "min-gfxclk", &set_min_gfxclk_freq },
+    { "prochot-deassertion-ramp", &set_prochot_deassertion_ramp },
+    { "apu-skin-temp", &set_apu_skin_temp_limit },
+    { "dgpu-skin-temp", &set_dgpu_skin_temp_limit },
+    { "apu-slow-limit", &set_apu_slow_limit },
+    { "skin-temp-limit", &set_skin_temp_power_limit }
+};
+
 RedmiOSD::RedmiOSD()
 {
     readPresets(m_filePath);
@@ -73,6 +112,11 @@ RedmiOSD::RedmiOSD()
         m_updateLiveEditTimer.start(1000);
     
     m_updatePresetTimer.start(m_presets.updateRate);
+}
+
+RedmiOSD::~RedmiOSD()
+{
+    cleanup_ryzenadj(g_ryzen);
 }
 
 void RedmiOSD::closeEvent(QCloseEvent *event)
@@ -271,12 +315,13 @@ void RedmiOSD::readPresets(const QString& filePath)
         QString shortcut = presetObject["shortcut"].toString();
         
         QJsonObject argsObject = presetObject["args"].toObject();
-        QStringList argsList;
+        
+        QMap<QString, int32_t> argsMap;
 
         for (auto it = argsObject.constBegin(); it != argsObject.constEnd(); ++it)
-            argsList << QString("--%1=%2").arg(it.key()).arg(it.value().toInt());
+            argsMap.insert(it.key(), it.value().toInt());
         
-        m_presets.argsMap.insert(presetName, argsList);
+        m_presets.argsMap.insert(presetName, argsMap);
         m_presets.shorcutsMap.insert(presetName, shortcut);
     }
 
@@ -351,19 +396,28 @@ void RedmiOSD::initPreset()
         m_presets.lastPreset = m_presets.defaultPreset;
         writePresets(m_filePath);
     }
+
+    g_ryzen = init_ryzenadj();
 }
 
-void RedmiOSD::applyPreset(const QStringList& args)
+void RedmiOSD::applyPreset(const QMap<QString, int32_t>& args)
 {
     qDebug() << "\nApplied with ryzenadj at" << QDateTime::currentDateTime().toString();
     
-    for (const auto& arg : args)
-        qDebug() << arg;
-    
-    QProcess* process = new QProcess();
-    process->start("Tools/ryzenadj.exe", args);
+    for (auto it = args.begin(); it != args.end(); ++it)
+    {
+        if (g_ryzenMapper.contains(it.key()))
+        {
+            g_ryzenMapper[it.key()](g_ryzen, it.value());
+            
+            qDebug() << it.key() << ":" << it.value();
+        }
+    }    
 
-    connect(process, &QProcess::finished, process, &QProcess::deleteLater);
+    refresh_table(g_ryzen);
+
+    g_fastCache = get_fast_limit(g_ryzen);
+    g_slowCache = get_slow_limit(g_ryzen);
 }
 
 void RedmiOSD::applyStartup(bool enable)
@@ -404,7 +458,13 @@ void RedmiOSD::showOSD(const QString& message)
 
 void RedmiOSD::updatePreset()
 {
-    applyPreset(m_presets.argsMap[m_presets.lastPreset]);
+    refresh_table(g_ryzen);
+
+    int32_t fastCurrent = get_fast_limit(g_ryzen);
+    int32_t slowCurrent = get_slow_limit(g_ryzen);
+
+    if (g_fastCache != fastCurrent || g_slowCache != slowCurrent)
+        applyPreset(m_presets.argsMap[m_presets.lastPreset]);
 }
 
 void RedmiOSD::updateLiveEdit()

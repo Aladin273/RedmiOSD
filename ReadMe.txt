@@ -4,6 +4,7 @@ Presets can be changed in the Presets.json file:
 
 - args can be changed according to ryzenadj
 - shortcuts can be changed for free
+- startup can be changed for free
 - showTray can be changed for free
 - showOverlay can be changed for free
 - defaultPreset can be “silence”, “turbo”, “lastPreset”.
