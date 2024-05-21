@@ -25,7 +25,9 @@
 #include <QJsonObject>
 #include <QDateTime>
 #include <QDesktopServices>
-#include <QSettings>
+#include <QStandardPaths>
+#include <QFileInfo>
+#include <QDir>
 
 #include <functional>
 
@@ -422,15 +424,18 @@ void RedmiOSD::applyPreset(const QMap<QString, int32_t>& args)
 
 void RedmiOSD::applyStartup(bool enable)
 {
+    QString startupPath = QStandardPaths::writableLocation(QStandardPaths::ApplicationsLocation) + QDir::toNativeSeparators("/Startup");
+
     if (enable)
     {
-        QSettings settings("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", QSettings::NativeFormat);
-        settings.setValue("RedmiOSD", QCoreApplication::applicationFilePath());
+        QFileInfo fileInfo(QCoreApplication::applicationFilePath());
+        QString linkPath = startupPath + QDir::toNativeSeparators("/") + fileInfo.completeBaseName() + ".lnk";
+        QFile::link(QCoreApplication::applicationFilePath(), linkPath);
     }
     else
     {
-        QSettings settings("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", QSettings::NativeFormat);
-        settings.remove("RedmiOSD");
+        QString linkPath = startupPath + QDir::toNativeSeparators("/") + "RedmiOSD.lnk";
+        QFile::remove(linkPath);
     }
 }
 
