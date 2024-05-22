@@ -404,6 +404,8 @@ void RedmiOSD::initPreset()
 
 void RedmiOSD::applyPreset(const QMap<QString, int32_t>& args)
 {
+    if (g_ryzen == nullptr) return;
+
     qDebug() << "\nApplied with ryzenadj at" << QDateTime::currentDateTime().toString();
     
     for (auto it = args.begin(); it != args.end(); ++it)
@@ -411,10 +413,10 @@ void RedmiOSD::applyPreset(const QMap<QString, int32_t>& args)
         if (g_ryzenMapper.contains(it.key()))
         {
             g_ryzenMapper[it.key()](g_ryzen, it.value());
-            
+
             qDebug() << it.key() << ":" << it.value();
         }
-    }    
+    }
 
     refresh_table(g_ryzen);
 
@@ -463,6 +465,8 @@ void RedmiOSD::showOSD(const QString& message)
 
 void RedmiOSD::updatePreset()
 {
+    if (g_ryzen == nullptr) return;
+
     refresh_table(g_ryzen);
 
     int32_t fastCurrent = get_fast_limit(g_ryzen);
