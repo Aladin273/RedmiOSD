@@ -30,6 +30,9 @@
 #include <QDir>
 
 #include <functional>
+#include <sstream> 
+
+#include <windows.h>
 
 int32_t g_fastCache = 0;
 
@@ -65,7 +68,7 @@ QMap<QString, std::function<void(ryzen_access, int32_t)>> g_ryzenMapper
     { "apu-skin-temp", &set_apu_skin_temp_limit },
     { "dgpu-skin-temp", &set_dgpu_skin_temp_limit },
     { "apu-slow-limit", &set_apu_slow_limit },
-    { "skin-temp-limit", &set_skin_temp_power_limit }
+    { "skin-temp-limit", &set_skin_temp_power_limit },
 };
 
 RedmiOSD::RedmiOSD()
@@ -416,6 +419,20 @@ void RedmiOSD::applyPreset(const QMap<QString, int32_t>& args)
 
             qDebug() << it.key() << ":" << it.value();
         }
+    }
+
+    if (args.contains("battery-saver"))
+    {
+        QString command = QString(
+            "powercfg /setdcvalueindex SCHEME_CURRENT SUB_ENERGYSAVER ESBATTTHRESHOLD %1 && "
+            "powercfg /setdcvalueindex SCHEME_CURRENT SUB_ENERGYSAVER ESBRIGHTNESS 100 && "
+            "powercfg /setactive SCHEME_CURRENT").arg(args["battery-saver"]);
+
+        QProcess process;
+        process.setProcessChannelMode(QProcess::MergedChannels);
+
+        process.start("cmd.exe", QStringList() << "/C" << command);
+        process.waitForFinished(-1);
     }
 
     refresh_table(g_ryzen);

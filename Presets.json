@@ -7,7 +7,8 @@
                 "stapm-limit": 15000,
                 "fast-limit": 15000,
                 "slow-limit": 15000,
-                "tctl-temp": 90
+                "tctl-temp": 90,
+                "battery-saver": 100
             }
         },
         {
@@ -17,7 +18,8 @@
                 "stapm-limit": 54000,
                 "fast-limit": 54000,
                 "slow-limit": 54000,
-                "tctl-temp": 90
+                "tctl-temp": 90,
+                "battery-saver": 0
             }
         }
     ],
